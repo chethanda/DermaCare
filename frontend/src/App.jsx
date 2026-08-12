@@ -151,7 +151,7 @@ export default function App() {
 
     const urlsToTry = [...new Set(candidates)];
 
-    for (const testUrl) {
+    for (const testUrl of urlsToTry) {
       try {
         const cleanBaseUrl = testUrl.endsWith('/') ? testUrl.slice(0, -1) : testUrl;
         const fetchUrl = `${cleanBaseUrl}/api/health`;
@@ -316,7 +316,6 @@ export default function App() {
       await requestLocationPermission();
       await startCamera();
     } catch (err) {
-      // Re-triggers the permission request directly
       navigator.geolocation.getCurrentPosition(() => {}, () => {}, { maximumAge: 0 });
     }
   };
@@ -328,7 +327,6 @@ export default function App() {
         fileInputRef.current.click();
       }
     } catch (err) {
-      // Re-triggers the permission request directly
       navigator.geolocation.getCurrentPosition(() => {}, () => {}, { maximumAge: 0 });
     }
   };
