@@ -22,6 +22,16 @@ const buildApiUrl = (baseUrl, path) => {
   return `${baseUrl}${p}`;
 };
 
+const getDoctorImage = (d) => {
+  if (!d) return "/doctors/ananya.png";
+  if (d.name && d.name.includes("Ananya")) return "/doctors/ananya.png";
+  if (d.name && d.name.includes("Rajesh")) return "/doctors/rajesh.png";
+  if (d.name && d.name.includes("Sunita")) return "/doctors/sunita.png";
+  if (d.name && d.name.includes("Vikramaditya")) return "/doctors/vikramaditya.png";
+  if (d.avatar_url && d.avatar_url.startsWith("http")) return d.avatar_url;
+  return "/doctors/ananya.png";
+};
+
 const services = [
   { icon: "✨", title: "Acne Scars & Pigmentation", desc: "Advanced laser & peel therapy targeting stubborn scars & sun spots.", price: "₹2,499" },
   { icon: "💧", title: "HydraGlow Skin Rejuvenation", desc: "Deep pore hydration and medical facial glow booster.", price: "₹1,999" },
@@ -155,7 +165,7 @@ export default function App() {
         specialty: "Aesthetic Dermatology & Laser Therapy", 
         experience_years: 14, 
         qualifications: "MD (AIIMS New Delhi), FRCP",
-        avatar_url: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "/doctors/ananya.png",
         bio: "Specialized in facial rejuvenation, acne scar removal, and advanced glow lasers."
       },
       { 
@@ -164,7 +174,7 @@ export default function App() {
         specialty: "Clinical Dermatology & Hair Restoration", 
         experience_years: 12, 
         qualifications: "MD, DNB (BMCRI Bengaluru)",
-        avatar_url: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "/doctors/rajesh.png",
         bio: "Expert in complex skin conditions, scalp rejuvenation, and anti-pigmentation care."
       },
       { 
@@ -173,7 +183,7 @@ export default function App() {
         specialty: "Pediatric & Cosmetic Skin Care", 
         experience_years: 9, 
         qualifications: "MD Dermatology (Manipal University)",
-        avatar_url: "https://images.unsplash.com/photo-1594824813572-c2c62c2f6d2f?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "/doctors/sunita.png",
         bio: "Focuses on holistic skin health, collagen restoration, and sensitive skin solutions."
       },
       { 
@@ -182,7 +192,7 @@ export default function App() {
         specialty: "Laser Resurfacing & Anti-Aging", 
         experience_years: 15, 
         qualifications: "MD (St. John's Medical College)",
-        avatar_url: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "/doctors/vikramaditya.png",
         bio: "Pioneer in non-surgical skin lifting, dermal fillers, and precision laser skin tightening."
       }
     ]);
@@ -693,11 +703,16 @@ export default function App() {
               <p className="text-slate-600 text-sm">Consult directly with internationally recognized clinical physicians.</p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {doctors.map((d) => (
                 <div key={d.id} className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
-                  <div className="relative h-64 overflow-hidden bg-slate-100">
-                    <img src={d.avatar_url} alt={d.name} className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500" />
+                  <div className="relative h-72 overflow-hidden bg-slate-100">
+                    <img 
+                      src={getDoctorImage(d)} 
+                      alt={d.name} 
+                      onError={(e) => { e.target.onerror = null; e.target.src = getDoctorImage(d); }}
+                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500" 
+                    />
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-bold text-[#0F4C5C] border border-slate-200">
                       {d.experience_years} Years Experience
                     </div>
