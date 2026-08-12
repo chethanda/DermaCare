@@ -338,7 +338,7 @@ export default function App() {
           latitude: lat,
           longitude: lng,
           accuracy: Math.round(acc),
-          address: `Verified (±${Math.round(acc)}m)`,
+          address: `Verified Location (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`,
           loading: false,
           error: ""
         });
@@ -975,7 +975,7 @@ export default function App() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
                 <h2 className="font-serif text-3xl font-bold text-slate-900 mb-1">My Clinical Appointments</h2>
-                <p className="text-slate-600 text-xs">View your scheduled consultations, diagnostic photos, and details.</p>
+                <p className="text-slate-600 text-xs">View your scheduled consultations, diagnostic photos, and location details.</p>
               </div>
               <button onClick={() => fetchAppointments(backendUrl)} className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold shadow-sm flex items-center gap-1.5 self-start">
                 <span>🔄</span> Refresh Appointments
@@ -1032,6 +1032,21 @@ export default function App() {
                             </div>
                           </div>
                         )}
+
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Clinic Location</span>
+                          <div className="bg-slate-900 text-slate-100 p-3.5 rounded-2xl text-xs flex items-center justify-between border border-slate-800">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                              <span className="text-emerald-400 font-bold">Location Verified</span>
+                            </div>
+                            {a.latitude && a.longitude && (
+                              <a href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`} target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-lg text-[10px] font-sans font-bold border border-emerald-400/30 transition">
+                                🗺️ View Map Location
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
