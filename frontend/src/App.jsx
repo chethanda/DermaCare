@@ -72,9 +72,6 @@ export default function App() {
   const [selectedSelfieModal, setSelectedSelfieModal] = useState(null);
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
 
-  // Permission Denial Modal State
-  const [showPermissionModal, setShowPermissionModal] = useState(false);
-
   const [doctors, setDoctors] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
@@ -103,7 +100,6 @@ export default function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const fileInputRef = useRef(null);
 
   const [location, setLocation] = useState({
     latitude: null,
@@ -279,67 +275,6 @@ export default function App() {
     setLoadingAppointments(false);
   };
 
-  const requestLocationPermission = () => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("Geolocation unsupported"));
-        return;
-      }
-
-      setLocation(prev => ({ ...prev, loading: true, error: "" }));
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const acc = position.coords.accuracy;
-          const locData = {
-            latitude: lat,
-            longitude: lng,
-            accuracy: Math.round(acc),
-            address: `Verified Location (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`,
-            loading: false,
-            error: ""
-          };
-          setLocation(locData);
-          setShowPermissionModal(false);
-          resolve(locData);
-        },
-        (err) => {
-          setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message });
-          // Detect permission denial and trigger the instruction modal
-          if (err.code === err.PERMISSION_DENIED) {
-            setShowPermissionModal(true);
-          } else {
-            showNotify("error", "Location request timed out. Please try again.");
-          }
-          reject(err);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    });
-  };
-
-  const handleLaunchCamera = async () => {
-    try {
-      await requestLocationPermission();
-      await startCamera();
-    } catch (err) {
-      console.log("Location access required to launch camera.");
-    }
-  };
-
-  const handleUploadClick = async () => {
-    try {
-      await requestLocationPermission();
-      if (fileInputRef.current) {
-        fileInputRef.current.click();
-      }
-    } catch (err) {
-      console.log("Location access required to upload photo.");
-    }
-  };
-
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -363,7 +298,15 @@ export default function App() {
         }
       }, 100);
     } catch (err) {
+      console.error("Camera permission error:", err);
       setCameraActive(false);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        showNotify("error", "Camera Access Denied: Please allow camera access in your browser settings.");
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        showNotify("error", "📷 No physical camera detected. Please connect a camera or test on a mobile device.");
+      } else {
+        showNotify("error", `Camera Error: ${err.message}`);
+      }
     }
   };
 
@@ -375,15 +318,40 @@ export default function App() {
     setCameraActive(false);
   };
 
-  const captureLocationAndAnalyze = async () => {
+  const captureLocationAndAnalyze = () => {
     setPhotoStatus('analyzing');
-    try {
-      await requestLocationPermission();
-      setPhotoStatus('analyzed');
-      showNotify("success", "✨ Skin photo analyzed successfully!");
-    } catch (err) {
+    setLocation(prev => ({ ...prev, loading: true, error: "" }));
+
+    if (!navigator.geolocation) {
       setPhotoStatus('analysis_error');
+      setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: "Analysis error" });
+      showNotify("error", "Skin photo capture failed. Please retake the photo.");
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const acc = position.coords.accuracy;
+        setLocation({
+          latitude: lat,
+          longitude: lng,
+          accuracy: Math.round(acc),
+          address: `Verified Location (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`,
+          loading: false,
+          error: ""
+        });
+        setPhotoStatus('analyzed');
+        showNotify("success", "✨ Skin photo analyzed successfully!");
+      },
+      (err) => {
+        setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message || "Timeout" });
+        setPhotoStatus('analysis_error');
+        showNotify("error", "Photo analysis timed out. Please retake the photo to try again.");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
   };
 
   const captureSelfie = () => {
@@ -509,7 +477,7 @@ export default function App() {
     }
 
     if (photoStatus === 'analysis_error' || location.latitude === null || location.longitude === null) {
-      setShowPermissionModal(true);
+      showNotify("error", "Photo analysis failed. Please retake the photo to process your booking.");
       return;
     }
 
@@ -589,15 +557,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FAFAF7] text-[#1C2541] flex flex-col font-sans selection:bg-[#0F4C5C] selection:text-white">
-      {/* Hidden File Input for Image Upload */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        onChange={handleFileUpload}
-        className="hidden"
-      />
-
       {/* Toast Notification Banner */}
       {notification && (
         <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl transition-all duration-300 border flex items-center gap-3 animate-bounce ${
@@ -938,7 +897,7 @@ export default function App() {
                           )}
                           {photoStatus === 'analysis_error' && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-bold">
-                              <span>⚠️</span> Analysis Error
+                              <span>⚠️</span> Analysis Failed
                             </div>
                           )}
 
@@ -947,17 +906,18 @@ export default function App() {
                           )}
                           {photoStatus === 'analysis_error' && (
                             <p className="text-xs text-rose-600 font-medium">
-                              Photo analysis could not complete. Please retake the photo.
+                              Photo analysis timed out. Please retake or upload the photo again.
                             </p>
                           )}
 
                           <div className="flex flex-wrap gap-3 justify-center sm:justify-start pt-1">
-                            <button type="button" onClick={handleLaunchCamera} className="text-xs text-[#0F4C5C] font-bold hover:underline">
+                            <button type="button" onClick={() => { setSelfieImage(null); setPhotoStatus('idle'); startCamera(); }} className="text-xs text-[#0F4C5C] font-bold hover:underline">
                               📷 Retake Photo
                             </button>
-                            <button type="button" onClick={handleUploadClick} className="text-xs text-[#0F4C5C] font-bold hover:underline">
+                            <label className="text-xs text-[#0F4C5C] font-bold hover:underline cursor-pointer">
                               📁 Upload New Photo
-                            </button>
+                              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                            </label>
                           </div>
                         </div>
                       </div>
@@ -983,12 +943,13 @@ export default function App() {
                       <div className="text-center p-4 space-y-3">
                         <p className="text-xs text-slate-600 font-medium">Please provide a clear skin photo for preliminary dermatological assessment.</p>
                         <div className="flex flex-wrap justify-center gap-3">
-                          <button type="button" onClick={handleLaunchCamera} className="px-6 py-3 bg-[#0F4C5C] hover:bg-[#1F4E43] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-teal-900/20">
+                          <button type="button" onClick={startCamera} className="px-6 py-3 bg-[#0F4C5C] hover:bg-[#1F4E43] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-teal-900/20">
                             <span>📷</span> Launch Camera
                           </button>
-                          <button type="button" onClick={handleUploadClick} className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer">
+                          <label className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer">
                             <span>📁</span> Upload Photo
-                          </button>
+                            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                          </label>
                         </div>
                       </div>
                     )}
@@ -1100,55 +1061,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* Location Permission Instructions Modal */}
-      {showPermissionModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowPermissionModal(false)}>
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-200 space-y-6 relative overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mx-auto shadow-inner border border-amber-200">
-              📍
-            </div>
-
-            <div className="text-center space-y-2">
-              <h3 className="font-serif font-bold text-2xl text-slate-900">Location Permission Required</h3>
-              <p className="text-slate-600 text-xs leading-relaxed">
-                Location access is currently denied in your browser. We require location permissions to analyze your skin photo and verify upload authenticity for clinical assessment.
-              </p>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3 text-xs text-slate-700">
-              <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wider">How to reset permission:</span>
-              <ol className="list-decimal list-inside space-y-1.5 text-slate-600 font-medium">
-                <li>Click the <strong>Lock (🔒) or Tune (⚙️)</strong> icon next to the URL in your address bar.</li>
-                <li>Locate <strong>Location</strong> setting and switch it to <strong>Allow</strong>.</li>
-                <li>Reload or click <strong>Retry Location Access</strong> below.</li>
-              </ol>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                onClick={async () => {
-                  try {
-                    await requestLocationPermission();
-                    if (cameraActive) {
-                      await startCamera();
-                    }
-                  } catch (e) {}
-                }}
-                className="w-full py-3.5 bg-gradient-to-r from-[#0F4C5C] to-[#1F4E43] text-white font-bold rounded-2xl text-xs shadow-lg shadow-teal-900/20 hover:scale-[1.02] transition"
-              >
-                🔄 Retry Location Access
-              </button>
-              <button
-                onClick={() => setShowPermissionModal(false)}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Selfie Modal Popup */}
       {selectedSelfieModal && (
