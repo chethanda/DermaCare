@@ -32,6 +32,29 @@ const getDoctorImage = (d) => {
   return "/doctors/ananya.png";
 };
 
+const ALL_CLINIC_SLOTS = [
+  { label: "09:30 AM", hour24: 9.5 },
+  { label: "10:30 AM", hour24: 10.5 },
+  { label: "11:30 AM", hour24: 11.5 },
+  { label: "02:00 PM", hour24: 14.0 },
+  { label: "03:30 PM", hour24: 15.5 },
+  { label: "04:30 PM", hour24: 16.5 },
+  { label: "06:00 PM", hour24: 18.0 }
+];
+
+const getAvailableTimeSlots = (selectedDate) => {
+  const todayStr = new Date().toISOString().split("T")[0];
+  if (!selectedDate || selectedDate > todayStr) {
+    return ALL_CLINIC_SLOTS;
+  }
+  if (selectedDate < todayStr) {
+    return [];
+  }
+  const now = new Date();
+  const currentHour24 = now.getHours() + (now.getMinutes() / 60);
+  return ALL_CLINIC_SLOTS.filter(slot => slot.hour24 > currentHour24);
+};
+
 const services = [
   { icon: "✨", title: "Acne Scars & Pigmentation", desc: "Advanced laser & peel therapy targeting stubborn scars & sun spots.", price: "₹2,499" },
   { icon: "💧", title: "HydraGlow Skin Rejuvenation", desc: "Deep pore hydration and medical facial glow booster.", price: "₹1,999" },
@@ -473,6 +496,17 @@ export default function App() {
       return;
     }
 
+    const availableSlots = getAvailableTimeSlots(bookingForm.appointment_date);
+    if (availableSlots.length === 0) {
+      showNotify("error", "No remaining time slots available for today. Please select a future date.");
+      return;
+    }
+    const isSlotValid = availableSlots.some(s => s.label === bookingForm.appointment_time);
+    if (!isSlotValid) {
+      showNotify("error", `The time slot '${bookingForm.appointment_time}' has already passed for today. Please select an available upcoming slot.`);
+      return;
+    }
+
     if (!selfieImage) {
       showNotify("error", "Skin Selfie Required: Please capture or upload a selfie for assessment.");
       return;
@@ -821,17 +855,33 @@ export default function App() {
                         required 
                         min={new Date().toISOString().split("T")[0]} 
                         value={bookingForm.appointment_date} 
-                        onChange={e => setBookingForm({...bookingForm, appointment_date: e.target.value})} 
+                        onChange={e => {
+                          const newDate = e.target.value;
+                          const avail = getAvailableTimeSlots(newDate);
+                          const firstValid = avail.length > 0 ? avail[0].label : "";
+                          setBookingForm({
+                            ...bookingForm, 
+                            appointment_date: newDate,
+                            appointment_time: avail.some(s => s.label === bookingForm.appointment_time) ? bookingForm.appointment_time : firstValid
+                          });
+                        }} 
                         className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none font-medium text-slate-900" 
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">Preferred Time Slot *</label>
-                      <select value={bookingForm.appointment_time} onChange={e => setBookingForm({...bookingForm, appointment_time: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none">
-                        <option>09:30 AM</option>
-                        <option>10:30 AM</option>
-                        <option>02:00 PM</option>
-                        <option>04:30 PM</option>
+                      <select 
+                        value={bookingForm.appointment_time} 
+                        onChange={e => setBookingForm({...bookingForm, appointment_time: e.target.value})} 
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none font-medium text-slate-900"
+                      >
+                        {getAvailableTimeSlots(bookingForm.appointment_date).length === 0 ? (
+                          <option value="">No remaining slots for today (Select a future date)</option>
+                        ) : (
+                          getAvailableTimeSlots(bookingForm.appointment_date).map(slot => (
+                            <option key={slot.label} value={slot.label}>{slot.label}</option>
+                          ))
+                        )}
                       </select>
                     </div>
                   </div>
