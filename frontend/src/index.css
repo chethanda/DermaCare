@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .gradient-gold {
+    background: linear-gradient(135deg, #0F4C5C 0%, #1F4E43 100%);
+  }
+}

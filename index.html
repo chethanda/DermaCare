@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DermaCare Hospital & Research Institute | Skin Rejuvenation & Clinic</title>
+
+  <!-- Google Fonts: Playfair Display & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,600&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- React & Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            rose: {
+              50: '#fff1f2',
+              100: '#ffe4e6',
+              600: '#e11d48',
+              700: '#be123c',
+            },
+            derma: {
+              cream: '#FAFAF7',
+              gold: '#D4AF37',
+              rose: '#E8B4B8',
+              teal: '#0F4C5C',
+              dark: '#1C2541',
+              emerald: '#1F4E43'
+            }
+          },
+          fontFamily: {
+            serif: ['Playfair Display', 'serif'],
+            sans: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #FAFAF7;
+      font-family: 'Inter', sans-serif;
+      color: #1C2541;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    .gradient-gold {
+      background: linear-gradient(135deg, #0F4C5C 0%, #1F4E43 100%);
+    }
+    .text-gradient {
+      background: linear-gradient(135deg, #1F4E43 0%, #0F4C5C 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #FAFAF7;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <div id="root"></div>
+
+  <!-- React App Babel Script -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Default API Endpoint (Local or Render)
+    const DEFAULT_API_URL = "http://localhost:5000";
+
+    function App() {
+      // API Settings
+      const [backendUrl, setBackendUrl] = useState(DEFAULT_API_URL);
+      const [apiStatus, setApiStatus] = useState({ connected: false, message: "Checking..." });
+
+      // Auth & State
+      const [user, setUser] = useState(null);
+      const [activeTab, setActiveTab] = useState("home"); // "home", "book", "dashboard", "doctors"
+      const [showAuthModal, setShowAuthModal] = useState(false);
+      const [authMode, setAuthMode] = useState("login"); // "login" or "register"
+
+      // Doctors list
+      const [doctors, setDoctors] = useState([]);
+      // Appointments list
+      const [appointments, setAppointments] = useState([]);
+      const [loadingAppointments, setLoadingAppointments] = useState(false);
+
+      // Form inputs for Auth
+      const [authForm, setAuthForm] = useState({ full_name: "", email: "", password: "", phone: "" });
+      const [authError, setAuthError] = useState("");
+
+      // Booking Form State
+      const [bookingForm, setBookingForm] = useState({
+        patient_name: "",
+        patient_email: "",
+        patient_phone: "",
+        age: "26",
+        gender: "Female",
+        skin_concern: "Acne Scars & Pigmentation",
+        doctor_id: "",
+        doctor_name: "Dr. Elena Rostova",
+        appointment_date: new Date().toISOString().split("T")[0],
+        appointment_time: "10:30 AM",
+        notes: ""
+      });
+
+      // Camera Selfie State
+      const [cameraActive, setCameraActive] = useState(false);
+      const [selfieImage, setSelfieImage] = useState(null);
+      const videoRef = useRef(null);
+      const canvasRef = useRef(null);
+      const streamRef = useRef(null);
+
+      // Geolocation State (Exact Lat/Long)
+      const [location, setLocation] = useState({
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        address: "",
+        loading: false,
+        error: ""
+      });
+
+      // Feedback Notifications
+      const [notification, setNotification] = useState(null);
+
+      // 1. Initial Health Check & Data Fetching
+      useEffect(() => {
+        // Load stored user if available
+        const savedUser = localStorage.getItem("derma_user");
+        if (savedUser) {
+          try { setUser(JSON.parse(savedUser)); } catch (e) {}
+        }
+        checkBackendStatus(backendUrl);
+        fetchDoctors(backendUrl);
+        fetchAppointments(backendUrl);
+      }, [backendUrl]);
+
+      const checkBackendStatus = async (url) => {
+        const urlsToTry = [url, "http://localhost:5000", "http://localhost:5001"];
+        for (const testUrl of [...new Set(urlsToTry)]) {
+          try {
+            const res = await fetch(`${testUrl}/api/health`);
+            if (res.ok) {
+              const data = await res.json();
+              setBackendUrl(testUrl);
+              setApiStatus({ 
+                connected: true, 
+                message: `API Active at ${testUrl} (${data.supabaseConnected ? 'Supabase Connected' : 'Memory Fallback'})`,
+                supabase: data.supabaseConnected
+              });
+              return testUrl;
+            }
+          } catch (e) {}
+        }
+        setApiStatus({ connected: false, message: "Backend Offline (Browser Fallback Active)" });
+        return null;
+      };
+
+      const fetchDoctors = async (url) => {
+        try {
+          const res = await fetch(`${url}/api/doctors`);
+          const data = await res.json();
+          if (data.success && data.doctors) {
+            setDoctors(data.doctors);
+          }
+        } catch (e) {
+          // Fallback doctors list
+          setDoctors([
+            { id: "d1", name: "Dr. Elena Rostova", specialty: "Aesthetic Dermatology & Laser Therapy", experience_years: 14, avatar_url: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=400&auto=format&fit=crop" },
+            { id: "d2", name: "Dr. Marcus Vance", specialty: "Clinical Dermatology & Hair Restoration", experience_years: 11, avatar_url: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400&auto=format&fit=crop" },
+            { id: "d3", name: "Dr. Sophia Lin", specialty: "Pediatric & Cosmetic Skin Care", experience_years: 9, avatar_url: "https://images.unsplash.com/photo-1594824813566-88855ce7890b?q=80&w=400&auto=format&fit=crop" }
+          ]);
+        }
+      };
+
+      const fetchAppointments = async (url) => {
+        setLoadingAppointments(true);
+        try {
+          const res = await fetch(`${url}/api/appointments`);
+          const data = await res.json();
+          if (data.success && data.appointments) {
+            setAppointments(data.appointments);
+          }
+        } catch (e) {
+          // Fallback static appointment
+          setAppointments([
+            {
+              id: "demo-1",
+              patient_name: "Sarah Jenkins",
+              patient_email: "sarah.j@example.com",
+              patient_phone: "+1 555-0199",
+              skin_concern: "Acne Scar Removal",
+              doctor_name: "Dr. Elena Rostova",
+              appointment_date: "2026-08-20",
+              appointment_time: "10:30 AM",
+              selfie_url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop",
+              latitude: 37.774929,
+              longitude: -122.419416,
+              location_address: "San Francisco, CA (Lat: 37.7749, Long: -122.4194)",
+              status: "Confirmed"
+            }
+          ]);
+        } finally {
+          setLoadingAppointments(false);
+        }
+      };
+
+      // 2. Camera Selfie Logic
+      const startCamera = async () => {
+        setCameraActive(true);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: false
+          });
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          showNotify("error", "Webcam Access Failed: Please allow camera permissions in your browser.");
+          setCameraActive(false);
+        }
+      };
+
+      const stopCamera = () => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+        setCameraActive(false);
+      };
+
+      const captureSelfie = () => {
+        if (videoRef.current && canvasRef.current) {
+          const video = videoRef.current;
+          const canvas = canvasRef.current;
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 480;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setSelfieImage(dataUrl);
+          stopCamera();
+          showNotify("success", "Selfie captured successfully!");
+        }
+      };
+
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setSelfieImage(reader.result);
+            showNotify("success", "Photo uploaded successfully!");
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      // 3. Exact Geolocation (Lat / Long) Capture
+      const getExactLocation = () => {
+        setLocation(prev => ({ ...prev, loading: true, error: "" }));
+        if (!navigator.geolocation) {
+          setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: "Geolocation is not supported by your browser." });
+          showNotify("error", "Geolocation unavailable on this browser.");
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const acc = position.coords.accuracy;
+            
+            setLocation({
+              latitude: lat,
+              longitude: lng,
+              accuracy: Math.round(acc),
+              address: `GPS Lat: ${lat.toFixed(6)}, Long: ${lng.toFixed(6)} (±${Math.round(acc)}m)`,
+              loading: false,
+              error: ""
+            });
+            showNotify("success", `Location detected: ${lat.toFixed(4)}°, ${lng.toFixed(4)}°`);
+          },
+          (err) => {
+            console.error("GPS Error:", err);
+            setLocation({
+              latitude: null,
+              longitude: null,
+              accuracy: null,
+              address: "",
+              loading: false,
+              error: "Unable to retrieve GPS coordinates. Please grant location permissions."
+            });
+            showNotify("error", "Location permission denied. Please allow GPS access.");
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      };
+
+      // Auto pre-fill user info into booking form
+      useEffect(() => {
+        if (user) {
+          setBookingForm(prev => ({
+            ...prev,
+            patient_name: user.full_name || prev.patient_name,
+            patient_email: user.email || prev.patient_email,
+            patient_phone: user.phone || prev.patient_phone
+          }));
+        }
+      }, [user]);
+
+      // 4. Handle Authentication (Login / Register)
+      const handleAuthSubmit = async (e) => {
+        e.preventDefault();
+        setAuthError("");
+
+        const endpoint = authMode === "login" ? "/api/auth/login" : "/api/auth/register";
+
+        try {
+          const res = await fetch(`${backendUrl}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(authForm)
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            setUser(data.user);
+            localStorage.setItem("derma_user", JSON.stringify(data.user));
+            setShowAuthModal(false);
+            showNotify("success", authMode === "login" ? `Welcome back, ${data.user.full_name}!` : "Account registered successfully!");
+          } else {
+            setAuthError(data.message || "Authentication failed.");
+          }
+        } catch (err) {
+          // Local demo bypass
+          const fakeUser = {
+            id: `user-${Date.now()}`,
+            full_name: authForm.full_name || "Patient Demo",
+            email: authForm.email || "patient@example.com",
+            phone: authForm.phone || "+1 555-0100",
+            role: "patient"
+          };
+          setUser(fakeUser);
+          localStorage.setItem("derma_user", JSON.stringify(fakeUser));
+          setShowAuthModal(false);
+          showNotify("success", `Signed in as ${fakeUser.full_name}`);
+        }
+      };
+
+      const handleLogout = () => {
+        setUser(null);
+        localStorage.removeItem("derma_user");
+        showNotify("info", "Logged out successfully.");
+      };
+
+      // 5. Handle Booking Submit
+      const handleBookingSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!user) {
+          setShowAuthModal(true);
+          showNotify("info", "Please log in to book your appointment.");
+          return;
+        }
+
+        if (!selfieImage) {
+          showNotify("error", "Selfie upload required! Please snap or upload a photo of your skin concern.");
+          return;
+        }
+
+        if (location.latitude === null || location.longitude === null) {
+          showNotify("error", "Exact location required! Click 'Detect Exact Lat/Long GPS' to continue.");
+          return;
+        }
+
+        const payload = {
+          user_id: user.id,
+          patient_name: bookingForm.patient_name || user.full_name,
+          patient_email: bookingForm.patient_email || user.email,
+          patient_phone: bookingForm.patient_phone || "+1 555-0000",
+          age: bookingForm.age,
+          gender: bookingForm.gender,
+          skin_concern: bookingForm.skin_concern,
+          doctor_name: bookingForm.doctor_name,
+          appointment_date: bookingForm.appointment_date,
+          appointment_time: bookingForm.appointment_time,
+          notes: bookingForm.notes,
+          selfie_url: selfieImage,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          location_address: location.address
+        };
+
+        try {
+          const res = await fetch(`${backendUrl}/api/appointments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+          if (data.success) {
+            showNotify("success", "🎉 Appointment booked! Stored selfie & exact lat/long coordinates.");
+            fetchAppointments(backendUrl);
+            setActiveTab("dashboard");
+          } else {
+            showNotify("error", data.message || "Failed to submit appointment.");
+          }
+        } catch (err) {
+          // Direct fallback mode append
+          const fallbackAppt = {
+            id: `appt-local-${Date.now()}`,
+            ...payload,
+            status: "Confirmed"
+          };
+          setAppointments(prev => [fallbackAppt, ...prev]);
+          showNotify("success", "🎉 Appointment booked locally! (Selfie & Lat/Long saved)");
+          setActiveTab("dashboard");
+        }
+      };
+
+      const showNotify = (type, msg) => {
+        setNotification({ type, msg });
+        setTimeout(() => setNotification(null), 4000);
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+          
+          {/* Notification Toast */}
+          {notification && (
+            <div className={`fixed top-5 right-5 z-50 px-6 py-4 rounded-xl shadow-2xl transition-all border flex items-center gap-3 ${
+              notification.type === 'success' ? 'bg-emerald-900 text-white border-emerald-500' :
+              notification.type === 'error' ? 'bg-rose-900 text-white border-rose-500' :
+              'bg-slate-900 text-white border-slate-700'
+            }`}>
+              <i data-lucide={notification.type === 'success' ? 'check-circle' : notification.type === 'error' ? 'alert-circle' : 'info'} className="w-5 h-5"></i>
+              <span className="font-medium text-sm">{notification.msg}</span>
+            </div>
+          )}
+
+          {/* Top Bar / Header */}
+          <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+              
+              {/* Brand Logo */}
+              <div onClick={() => setActiveTab("home")} className="flex items-center gap-3 cursor-pointer">
+                <div className="w-11 h-11 rounded-2xl gradient-gold flex items-center justify-center text-white shadow-md">
+                  <span className="font-serif text-2xl font-bold">D</span>
+                </div>
+                <div>
+                  <h1 className="font-serif font-bold text-xl text-slate-900 leading-tight">DermaCare Hospital</h1>
+                  <p className="text-xs text-derma-teal font-medium tracking-wide uppercase">Skin & Aesthetic Institute</p>
+                </div>
+              </div>
+
+              {/* Navigation Menu */}
+              <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+                <button onClick={() => setActiveTab("home")} className={`transition hover:text-derma-teal ${activeTab === 'home' ? 'text-derma-teal font-semibold' : ''}`}>Home</button>
+                <button onClick={() => setActiveTab("doctors")} className={`transition hover:text-derma-teal ${activeTab === 'doctors' ? 'text-derma-teal font-semibold' : ''}`}>Specialists</button>
+                <button onClick={() => setActiveTab("book")} className={`transition hover:text-derma-teal ${activeTab === 'book' ? 'text-derma-teal font-semibold' : ''}`}>Book Appointment</button>
+                <button onClick={() => setActiveTab("dashboard")} className={`transition hover:text-derma-teal ${activeTab === 'dashboard' ? 'text-derma-teal font-semibold' : ''}`}>
+                  Appointments DB ({appointments.length})
+                </button>
+              </nav>
+
+              {/* Actions (Auth & Settings) */}
+              <div className="flex items-center gap-3">
+                {user ? (
+                  <div className="flex items-center gap-3">
+                    <div className="text-right hidden sm:block">
+                      <div className="text-xs text-slate-400">Welcome</div>
+                      <div className="text-sm font-semibold text-slate-800">{user.full_name}</div>
+                    </div>
+                    <button onClick={handleLogout} className="px-4 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition">
+                      Logout
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setAuthMode("login"); setShowAuthModal(true); }} className="px-5 py-2.5 rounded-xl gradient-gold text-white font-medium text-sm shadow-sm hover:opacity-95 transition">
+                    Sign In
+                  </button>
+                )}
+              </div>
+
+            </div>
+
+            {/* Sub-bar: API Backend Status */}
+            <div className="bg-slate-900 text-slate-300 text-xs py-1.5 px-4 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${apiStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                  <span>Backend Status: {apiStatus.message}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-slate-400">API URL:</label>
+                  <input
+                    type="text"
+                    value={backendUrl}
+                    onChange={(e) => setBackendUrl(e.target.value)}
+                    className="bg-slate-800 text-slate-200 border border-slate-700 px-2 py-0.5 rounded text-xs w-48"
+                  />
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* MAIN CONTENT AREA */}
+          <main className="flex-grow">
+
+            {/* TAB 1: HOME LANDING */}
+            {activeTab === "home" && (
+              <div>
+                {/* Hero Section */}
+                <section className="relative overflow-hidden pt-12 pb-20 bg-gradient-to-b from-derma-cream to-white">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                      <span className="inline-block px-3.5 py-1.5 rounded-full bg-emerald-50 text-derma-emerald text-xs font-semibold tracking-wider uppercase mb-4 border border-emerald-200">
+                        Board Certified Dermatology Hospital
+                      </span>
+                      <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-slate-900 font-bold leading-tight mb-6">
+                        Revitalize Your Skin With Clinical Precision
+                      </h1>
+                      <p className="text-slate-600 text-lg leading-relaxed mb-8">
+                        Experience premier dermatological care. From laser acne scar repair to deep hydration glow therapy, book instant consultations with live selfie diagnostic upload and precise GPS tracking.
+                      </p>
+                      
+                      <div className="flex flex-wrap gap-4">
+                        <button onClick={() => setActiveTab("book")} className="px-7 py-3.5 rounded-2xl gradient-gold text-white font-semibold text-base shadow-lg hover:shadow-xl transition">
+                          Book Consultation Now
+                        </button>
+                        <button onClick={() => setActiveTab("doctors")} className="px-7 py-3.5 rounded-2xl bg-white border border-slate-300 text-slate-700 font-semibold text-base hover:bg-slate-50 transition">
+                          Meet Our Doctors
+                        </button>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-slate-200">
+                        <div>
+                          <div className="font-serif font-bold text-2xl text-derma-teal">15,000+</div>
+                          <div className="text-xs text-slate-500">Patients Cured</div>
+                        </div>
+                        <div>
+                          <div className="font-serif font-bold text-2xl text-derma-teal">99.8%</div>
+                          <div className="text-xs text-slate-500">Satisfaction Rate</div>
+                        </div>
+                        <div>
+                          <div className="font-serif font-bold text-2xl text-derma-teal">18+</div>
+                          <div className="text-xs text-slate-500">Senior Specialists</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hero Showcase Image */}
+                    <div className="relative">
+                      <div className="w-full h-[460px] rounded-3xl overflow-hidden shadow-2xl border-4 border-white relative">
+                        <img src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?q=80&w=800&auto=format&fit=crop" alt="Skin Care Hospital" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent flex items-end p-8">
+                          <div className="text-white">
+                            <div className="text-sm font-semibold text-emerald-300">Laser & Glow Therapy Room</div>
+                            <div className="text-xs opacity-80">State-of-the-art dermatological equipment</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Clinical Services */}
+                <section className="py-16 bg-white border-t border-slate-100">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center max-w-2xl mx-auto mb-12">
+                      <h2 className="font-serif text-3xl font-bold text-slate-900">Specialized Treatments</h2>
+                      <p className="text-slate-500 text-sm mt-2">Customized skincare solutions tailored to your unique skin profile.</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-8">
+                      {[
+                        { title: "Acne & Scar Laser Resurfacing", desc: "Fractional CO2 laser therapy to permanently erase hyperpigmentation and deep scars.", img: "https://images.unsplash.com/photo-1512290900676-26c2a4d0b5ae?q=80&w=400&auto=format&fit=crop" },
+                        { title: "Hydrafacial Glow Treatment", desc: "Patented vortex fusion technology that cleanses, extracts, and hydrates with antioxidant serums.", img: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=400&auto=format&fit=crop" },
+                        { title: "Anti-Aging & Collagen Booster", desc: "Non-invasive microneedling RF for sagging skin, fine lines, and firm volume restoration.", img: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=400&auto=format&fit=crop" }
+                      ].map((item, idx) => (
+                        <div key={idx} className="glass-card rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
+                          <img src={item.img} alt={item.title} className="w-full h-48 object-cover" />
+                          <div className="p-6">
+                            <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">{item.title}</h3>
+                            <p className="text-slate-600 text-sm leading-relaxed mb-4">{item.desc}</p>
+                            <button onClick={() => setActiveTab("book")} className="text-derma-teal text-sm font-semibold hover:underline">Book Consultation →</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* TAB 2: SPECIALISTS / DOCTORS */}
+            {activeTab === "doctors" && (
+              <section className="py-12 max-w-7xl mx-auto px-4">
+                <div className="mb-10 text-center">
+                  <h2 className="font-serif text-3xl font-bold text-slate-900">Our Senior Dermatologists</h2>
+                  <p className="text-slate-500 text-sm mt-2">Consult with internationally acclaimed medical and cosmetic dermatologists.</p>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-8">
+                  {doctors.map(doc => (
+                    <div key={doc.id} className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-md p-6 flex flex-col justify-between">
+                      <div>
+                        <div className="w-32 h-32 rounded-2xl overflow-hidden mx-auto mb-4 border-2 border-derma-rose">
+                          <img src={doc.avatar_url} alt={doc.name} className="w-full h-full object-cover" />
+                        </div>
+                        <h3 className="font-serif text-center font-bold text-xl text-slate-900">{doc.name}</h3>
+                        <p className="text-center text-xs font-semibold text-derma-teal uppercase tracking-wider mb-3">{doc.specialty}</p>
+                        <p className="text-xs text-slate-500 text-center mb-4">{doc.experience_years} Years Clinical Experience</p>
+                      </div>
+                      <button onClick={() => { setBookingForm(prev => ({ ...prev, doctor_name: doc.name })); setActiveTab("book"); }} className="w-full py-2.5 rounded-xl gradient-gold text-white font-medium text-sm hover:opacity-90 transition">
+                        Select Dr. {doc.name.split(" ")[1]}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* TAB 3: APPOINTMENT BOOKING FORM (SELFIE + LAT/LONG GEOLOCATION) */}
+            {activeTab === "book" && (
+              <section className="py-10 max-w-4xl mx-auto px-4">
+                <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-10">
+                  <div className="border-b border-slate-100 pb-6 mb-8 text-center sm:text-left">
+                    <h2 className="font-serif text-3xl font-bold text-slate-900">Book Dermatology Appointment</h2>
+                    <p className="text-slate-500 text-sm mt-1">Provide your details, snap a skin photo, and capture your exact GPS location for doctor review.</p>
+                  </div>
+
+                  <form onSubmit={handleBookingSubmit} className="space-y-8">
+
+                    {/* Step 1: Patient Information */}
+                    <div>
+                      <h3 className="font-semibold text-slate-900 text-base mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs">1</span>
+                        Patient Profile
+                      </h3>
+                      
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            value={bookingForm.patient_name}
+                            onChange={(e) => setBookingForm({ ...bookingForm, patient_name: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-derma-teal focus:outline-none text-sm"
+                            placeholder="John Doe"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Email Address *</label>
+                          <input
+                            type="email"
+                            required
+                            value={bookingForm.patient_email}
+                            onChange={(e) => setBookingForm({ ...bookingForm, patient_email: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-derma-teal focus:outline-none text-sm"
+                            placeholder="john@example.com"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Phone Number *</label>
+                          <input
+                            type="tel"
+                            required
+                            value={bookingForm.patient_phone}
+                            onChange={(e) => setBookingForm({ ...bookingForm, patient_phone: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-derma-teal focus:outline-none text-sm"
+                            placeholder="+1 (555) 000-0000"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Age & Gender</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              value={bookingForm.age}
+                              onChange={(e) => setBookingForm({ ...bookingForm, age: e.target.value })}
+                              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm"
+                              placeholder="Age"
+                            />
+                            <select
+                              value={bookingForm.gender}
+                              onChange={(e) => setBookingForm({ ...bookingForm, gender: e.target.value })}
+                              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm"
+                            >
+                              <option>Female</option>
+                              <option>Male</option>
+                              <option>Other</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 2: Skin Concern & Doctor Selection */}
+                    <div>
+                      <h3 className="font-semibold text-slate-900 text-base mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs">2</span>
+                        Skin Concern & Doctor
+                      </h3>
+
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Primary Skin Concern *</label>
+                          <select
+                            value={bookingForm.skin_concern}
+                            onChange={(e) => setBookingForm({ ...bookingForm, skin_concern: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm"
+                          >
+                            <option>Acne Scars & Active Breakouts</option>
+                            <option>Pigmentation & Melasma</option>
+                            <option>Anti-Aging & Wrinkle Laser</option>
+                            <option>Eczema & Rosacea Flare-up</option>
+                            <option>Hair Loss & Scalp Rejuvenation</option>
+                            <option>Routine Glow Maintenance</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Preferred Specialist</label>
+                          <select
+                            value={bookingForm.doctor_name}
+                            onChange={(e) => setBookingForm({ ...bookingForm, doctor_name: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm"
+                          >
+                            <option>Dr. Elena Rostova (Laser & Rejuvenation)</option>
+                            <option>Dr. Marcus Vance (Clinical & Scalp)</option>
+                            <option>Dr. Sophia Lin (Cosmetic & Sensitive Skin)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Date *</label>
+                          <input
+                            type="date"
+                            required
+                            value={bookingForm.appointment_date}
+                            onChange={(e) => setBookingForm({ ...bookingForm, appointment_date: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">Time Slot *</label>
+                          <select
+                            value={bookingForm.appointment_time}
+                            onChange={(e) => setBookingForm({ ...bookingForm, appointment_time: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm"
+                          >
+                            <option>09:00 AM</option>
+                            <option>10:30 AM</option>
+                            <option>02:00 PM</option>
+                            <option>04:30 PM</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 3: Selfie Capture (Webcam or Upload) */}
+                    <div>
+                      <h3 className="font-semibold text-slate-900 text-base mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs">3</span>
+                        Take Selfie Photo (Skin Diagnostic Image) *
+                      </h3>
+
+                      <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center bg-slate-50">
+                        {selfieImage ? (
+                          <div className="space-y-4">
+                            <div className="w-48 h-48 mx-auto rounded-2xl overflow-hidden border-4 border-emerald-500 shadow-md">
+                              <img src={selfieImage} alt="Captured Selfie" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex justify-center gap-4">
+                              <button
+                                type="button"
+                                onClick={() => { setSelfieImage(null); startCamera(); }}
+                                className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700"
+                              >
+                                Retake Selfie
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelfieImage(null)}
+                                className="px-4 py-2 rounded-xl bg-rose-100 text-rose-700 text-xs font-semibold hover:bg-rose-200"
+                              >
+                                Remove Photo
+                              </button>
+                            </div>
+                          </div>
+                        ) : cameraActive ? (
+                          <div className="space-y-4">
+                            <div className="w-64 h-48 mx-auto rounded-2xl bg-black overflow-hidden relative border-2 border-derma-teal">
+                              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover"></video>
+                              <canvas ref={canvasRef} className="hidden"></canvas>
+                            </div>
+                            <div className="flex justify-center gap-3">
+                              <button
+                                type="button"
+                                onClick={captureSelfie}
+                                className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-xs shadow hover:bg-emerald-700"
+                              >
+                                📸 Snap Photo
+                              </button>
+                              <button
+                                type="button"
+                                onClick={stopCamera}
+                                className="px-4 py-2.5 rounded-xl bg-slate-300 text-slate-700 text-xs font-semibold"
+                              >
+                                Cancel Camera
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="text-slate-500 text-sm">
+                              Capture a clear close-up selfie of your skin concern for our dermatologists.
+                            </div>
+                            <div className="flex flex-wrap justify-center gap-4">
+                              <button
+                                type="button"
+                                onClick={startCamera}
+                                className="px-6 py-3 rounded-xl gradient-gold text-white font-semibold text-xs shadow hover:opacity-90 flex items-center gap-2"
+                              >
+                                📷 Open Camera & Snap Selfie
+                              </button>
+                              <label className="px-6 py-3 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold text-xs cursor-pointer hover:bg-slate-100">
+                                📁 Upload Photo File
+                                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Step 4: Geolocation Capture (Exact Latitude & Longitude) */}
+                    <div>
+                      <h3 className="font-semibold text-slate-900 text-base mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs">4</span>
+                        Exact Patient Location (Latitude & Longitude GPS) *
+                      </h3>
+
+                      <div className="bg-slate-900 text-white p-6 rounded-2xl space-y-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div>
+                            <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">GPS Coordinates Status</div>
+                            {location.latitude !== null ? (
+                              <div className="text-emerald-400 font-mono text-sm mt-1">
+                                ✅ Latitude: <strong>{location.latitude}</strong> | Longitude: <strong>{location.longitude}</strong>
+                              </div>
+                            ) : (
+                              <div className="text-amber-400 text-xs mt-1">
+                                ⚠️ Location not detected yet. Click button below to enable GPS coordinates.
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={getExactLocation}
+                            disabled={location.loading}
+                            className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-900 font-bold text-xs hover:bg-emerald-400 transition"
+                          >
+                            {location.loading ? "Detecting GPS..." : "📍 Detect My Exact Lat/Long"}
+                          </button>
+                        </div>
+
+                        {location.latitude !== null && (
+                          <div className="pt-3 border-t border-slate-800 text-xs text-slate-300 flex justify-between">
+                            <span>Accuracy: ±{location.accuracy} meters</span>
+                            <a
+                              href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-400 underline font-semibold"
+                            >
+                              View Pin on Google Maps ↗
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Step 5: Submission Button */}
+                    <div className="pt-4 border-t border-slate-100">
+                      <button
+                        type="submit"
+                        className="w-full py-4 rounded-2xl gradient-gold text-white font-bold text-base shadow-xl hover:opacity-95 transition"
+                      >
+                        Confirm Appointment Booking & Save to Supabase DB
+                      </button>
+                    </div>
+
+                  </form>
+                </div>
+              </section>
+            )}
+
+            {/* TAB 4: APPOINTMENTS DATABASE VIEW (VIEW SELFIES & LAT/LONG) */}
+            {activeTab === "dashboard" && (
+              <section className="py-10 max-w-7xl mx-auto px-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                  <div>
+                    <h2 className="font-serif text-3xl font-bold text-slate-900">Database Appointments Registry</h2>
+                    <p className="text-slate-500 text-sm mt-1">Live data fetched from Supabase / Backend API including patient selfies and GPS coordinates.</p>
+                  </div>
+                  <button onClick={() => fetchAppointments(backendUrl)} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-medium hover:bg-slate-800">
+                    🔄 Refresh Database
+                  </button>
+                </div>
+
+                {loadingAppointments ? (
+                  <div className="text-center py-16 text-slate-500">Loading appointments database...</div>
+                ) : appointments.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+                    <p className="text-slate-500 text-base">No appointments booked yet.</p>
+                    <button onClick={() => setActiveTab("book")} className="mt-4 px-6 py-2.5 rounded-xl gradient-gold text-white text-xs font-semibold">
+                      Book First Appointment
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {appointments.map((appt, i) => (
+                      <div key={appt.id || i} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-md flex flex-col justify-between">
+                        <div>
+                          {/* Header */}
+                          <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100">
+                            <div>
+                              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs uppercase tracking-wide">
+                                {appt.status || "Confirmed"}
+                              </span>
+                              <h3 className="font-serif font-bold text-xl text-slate-900 mt-2">{appt.patient_name}</h3>
+                              <p className="text-xs text-slate-500">{appt.patient_email} • {appt.patient_phone}</p>
+                            </div>
+                            <div className="text-right text-xs text-slate-400">
+                              <div>{appt.appointment_date}</div>
+                              <div className="font-semibold text-slate-700">{appt.appointment_time}</div>
+                            </div>
+                          </div>
+
+                          {/* Details & Doctor */}
+                          <div className="space-y-2 text-xs text-slate-600 mb-4">
+                            <div><strong>Skin Concern:</strong> {appt.skin_concern}</div>
+                            <div><strong>Doctor:</strong> {appt.doctor_name}</div>
+                            {appt.notes && <div><strong>Notes:</strong> {appt.notes}</div>}
+                          </div>
+
+                          {/* Selfie Image View */}
+                          <div className="mb-4">
+                            <div className="text-xs font-semibold text-slate-700 mb-2">Submitted Skin Selfie:</div>
+                            <div className="w-full h-44 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+                              {appt.selfie_url ? (
+                                <img src={appt.selfie_url} alt="Patient Selfie" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="flex items-center justify-center h-full text-slate-400 text-xs">No image provided</div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Exact Geolocation Box */}
+                          <div className="bg-slate-900 text-white p-3.5 rounded-xl text-xs space-y-1">
+                            <div className="text-emerald-400 font-semibold uppercase tracking-wider text-[10px]">Exact Patient GPS Location</div>
+                            <div className="font-mono text-slate-200">
+                              Lat: <strong>{appt.latitude}</strong> | Long: <strong>{appt.longitude}</strong>
+                            </div>
+                            <div className="pt-1">
+                              <a
+                                href={`https://www.google.com/maps?q=${appt.latitude},${appt.longitude}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-emerald-400 underline hover:text-emerald-300"
+                              >
+                                View Pin on Map ↗
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+          </main>
+
+          {/* AUTHENTICATION MODAL */}
+          {showAuthModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl relative">
+                <button onClick={() => setShowAuthModal(false)} className="absolute top-5 right-5 text-slate-400 hover:text-slate-600">✕</button>
+                
+                <h3 className="font-serif font-bold text-2xl text-slate-900 mb-2">
+                  {authMode === "login" ? "Welcome Back" : "Create Patient Account"}
+                </h3>
+                <p className="text-slate-500 text-xs mb-6">
+                  {authMode === "login" ? "Sign in to book and manage your skin care appointments." : "Register to access dermatology consultations."}
+                </p>
+
+                {authError && (
+                  <div className="mb-4 p-3 bg-rose-50 text-rose-700 rounded-xl text-xs font-medium border border-rose-200">
+                    {authError}
+                  </div>
+                )}
+
+                <form onSubmit={handleAuthSubmit} className="space-y-4">
+                  {authMode === "register" && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={authForm.full_name}
+                        onChange={(e) => setAuthForm({ ...authForm, full_name: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-derma-teal"
+                        placeholder="Sarah Jenkins"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={authForm.email}
+                      onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-derma-teal"
+                      placeholder="patient@skincare.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={authForm.password}
+                      onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-derma-teal"
+                      placeholder="••••••••"
+                    />
+                  </div>
+
+                  {authMode === "register" && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">Phone Number</label>
+                      <input
+                        type="tel"
+                        value={authForm.phone}
+                        onChange={(e) => setAuthForm({ ...authForm, phone: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-derma-teal"
+                        placeholder="+1 555 019 992"
+                      />
+                    </div>
+                  )}
+
+                  <button type="submit" className="w-full py-3 rounded-xl gradient-gold text-white font-bold text-sm shadow hover:opacity-90 transition">
+                    {authMode === "login" ? "Sign In" : "Register Account"}
+                  </button>
+                </form>
+
+                <div className="mt-6 text-center text-xs text-slate-500">
+                  {authMode === "login" ? (
+                    <div>Don't have an account? <button onClick={() => setAuthMode("register")} className="text-derma-teal font-semibold underline">Sign up here</button></div>
+                  ) : (
+                    <div>Already have an account? <button onClick={() => setAuthMode("login")} className="text-derma-teal font-semibold underline">Log in here</button></div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER */}
+          <footer className="bg-slate-900 text-white py-12 border-t border-slate-800 mt-20">
+            <div className="max-w-7xl mx-auto px-4 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-6">
+              <div>
+                <h4 className="font-serif font-bold text-lg text-emerald-400">DermaCare Skin Hospital</h4>
+                <p className="text-xs text-slate-400 mt-1">Advanced Aesthetic Laser & Clinical Skin Diagnostics</p>
+              </div>
+              <div className="text-xs text-slate-400">
+                Host Database: Supabase • Backend: Render • Frontend: Vercel Ready
+              </div>
+            </div>
+          </footer>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
