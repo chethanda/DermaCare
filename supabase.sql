@@ -75,10 +75,10 @@ ON CONFLICT (id) DO NOTHING;
 -- 8. INSERT INDIAN DERMATOLOGY DOCTORS
 INSERT INTO public.doctors (id, name, specialty, qualifications, experience_years, avatar_url, bio)
 VALUES 
-('11111111-1111-1111-1111-111111111111', 'Dr. Ananya Deshmukh', 'Aesthetic Dermatology & Laser Therapy', 'MD (AIIMS New Delhi), FRCP', 14, 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=400&auto=format&fit=crop', 'Specialized in facial rejuvenation, acne scar removal, and advanced glow lasers.'),
-('22222222-2222-2222-2222-222222222222', 'Dr. Rajesh Iyer', 'Clinical Dermatology & Hair Restoration', 'MD, DNB (BMCRI Bengaluru)', 12, 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400&auto=format&fit=crop', 'Expert in complex skin conditions, scalp rejuvenation, and anti-pigmentation care.'),
-('33333333-3333-3333-3333-333333333333', 'Dr. Sunita Rao', 'Pediatric & Cosmetic Skin Care', 'MD Dermatology (Manipal University)', 9, 'https://images.unsplash.com/photo-1651008376811-b90baee60c1f?q=80&w=400&auto=format&fit=crop', 'Focuses on holistic skin health, collagen restoration, and sensitive skin solutions.'),
-('44444444-4444-4444-4444-444444444444', 'Dr. Vikramaditya Kulkarni', 'Laser Resurfacing & Anti-Aging', 'MD (St. John''s Medical College)', 15, 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?q=80&w=400&auto=format&fit=crop', 'Pioneer in non-surgical skin lifting, dermal fillers, and precision laser skin tightening.')
+('11111111-1111-1111-1111-111111111111', 'Dr. Ananya Deshmukh', 'Aesthetic Dermatology & Laser Therapy', 'MD (AIIMS New Delhi), FRCP', 14, 'https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?q=80&w=400&auto=format&fit=crop', 'Specialized in facial rejuvenation, acne scar removal, and advanced glow lasers.'),
+('22222222-2222-2222-2222-222222222222', 'Dr. Rajesh Iyer', 'Clinical Dermatology & Hair Restoration', 'MD, DNB (BMCRI Bengaluru)', 12, 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=400&auto=format&fit=crop', 'Expert in complex skin conditions, scalp rejuvenation, and anti-pigmentation care.'),
+('33333333-3333-3333-3333-333333333333', 'Dr. Sunita Rao', 'Pediatric & Cosmetic Skin Care', 'MD Dermatology (Manipal University)', 9, 'https://images.unsplash.com/photo-1594824813572-c2c62c2f6d2f?q=80&w=400&auto=format&fit=crop', 'Focuses on holistic skin health, collagen restoration, and sensitive skin solutions.'),
+('44444444-4444-4444-4444-444444444444', 'Dr. Vikramaditya Kulkarni', 'Laser Resurfacing & Anti-Aging', 'MD (St. John''s Medical College)', 15, 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?q=80&w=400&auto=format&fit=crop', 'Pioneer in non-surgical skin lifting, dermal fillers, and precision laser skin tightening.')
 ON CONFLICT (id) DO NOTHING;
 
 -- 9. INSERT INITIAL TEST APPOINTMENT

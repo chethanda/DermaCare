@@ -155,7 +155,7 @@ export default function App() {
         specialty: "Aesthetic Dermatology & Laser Therapy", 
         experience_years: 14, 
         qualifications: "MD (AIIMS New Delhi), FRCP",
-        avatar_url: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?q=80&w=400&auto=format&fit=crop",
         bio: "Specialized in facial rejuvenation, acne scar removal, and advanced glow lasers."
       },
       { 
@@ -164,7 +164,7 @@ export default function App() {
         specialty: "Clinical Dermatology & Hair Restoration", 
         experience_years: 12, 
         qualifications: "MD, DNB (BMCRI Bengaluru)",
-        avatar_url: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=400&auto=format&fit=crop",
         bio: "Expert in complex skin conditions, scalp rejuvenation, and anti-pigmentation care."
       },
       { 
@@ -173,7 +173,7 @@ export default function App() {
         specialty: "Pediatric & Cosmetic Skin Care", 
         experience_years: 9, 
         qualifications: "MD Dermatology (Manipal University)",
-        avatar_url: "https://images.unsplash.com/photo-1651008376811-b90baee60c1f?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "https://images.unsplash.com/photo-1594824813572-c2c62c2f6d2f?q=80&w=400&auto=format&fit=crop",
         bio: "Focuses on holistic skin health, collagen restoration, and sensitive skin solutions."
       },
       { 
@@ -182,7 +182,7 @@ export default function App() {
         specialty: "Laser Resurfacing & Anti-Aging", 
         experience_years: 15, 
         qualifications: "MD (St. John's Medical College)",
-        avatar_url: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?q=80&w=400&auto=format&fit=crop",
+        avatar_url: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?q=80&w=400&auto=format&fit=crop",
         bio: "Pioneer in non-surgical skin lifting, dermal fillers, and precision laser skin tightening."
       }
     ]);
