@@ -151,7 +151,7 @@ export default function App() {
 
     const urlsToTry = [...new Set(candidates)];
 
-    for (const testUrl of urlsToTry) {
+    for (const testUrl) {
       try {
         const cleanBaseUrl = testUrl.endsWith('/') ? testUrl.slice(0, -1) : testUrl;
         const fetchUrl = `${cleanBaseUrl}/api/health`;
@@ -276,11 +276,10 @@ export default function App() {
     setLoadingAppointments(false);
   };
 
-  // Prompts for location permission first before enabling camera or upload
+  // Re-triggers the native location prompt directly when called
   const requestLocationPermission = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        showNotify("error", "Geolocation is not supported by your browser.");
         reject(new Error("Geolocation unsupported"));
         return;
       }
@@ -304,37 +303,33 @@ export default function App() {
           resolve(locData);
         },
         (err) => {
-          setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message || "Location permission denied." });
-          setPhotoStatus('analysis_error');
-          showNotify("error", "📍 Location access is required. Please allow location permissions in your browser settings to proceed.");
+          setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message });
           reject(err);
         },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     });
   };
 
   const handleLaunchCamera = async () => {
     try {
-      // Require location permission first
       await requestLocationPermission();
-      // On success, start camera
       await startCamera();
     } catch (err) {
-      console.log("Camera launch blocked until location permission is granted.");
+      // Re-triggers the permission request directly
+      navigator.geolocation.getCurrentPosition(() => {}, () => {}, { maximumAge: 0 });
     }
   };
 
   const handleUploadClick = async () => {
     try {
-      // Require location permission first
       await requestLocationPermission();
-      // On success, trigger file input picker
       if (fileInputRef.current) {
         fileInputRef.current.click();
       }
     } catch (err) {
-      console.log("Upload blocked until location permission is granted.");
+      // Re-triggers the permission request directly
+      navigator.geolocation.getCurrentPosition(() => {}, () => {}, { maximumAge: 0 });
     }
   };
 
@@ -361,15 +356,7 @@ export default function App() {
         }
       }, 100);
     } catch (err) {
-      console.error("Camera permission error:", err);
       setCameraActive(false);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        showNotify("error", "Camera Access Denied: Please allow camera access in your browser settings.");
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        showNotify("error", "📷 No physical camera detected. Please connect a camera or test on a mobile device.");
-      } else {
-        showNotify("error", `Camera Error: ${err.message}`);
-      }
     }
   };
 
@@ -384,7 +371,6 @@ export default function App() {
   const captureLocationAndAnalyze = async () => {
     setPhotoStatus('analyzing');
     try {
-      // Re-verify location during photo analysis
       await requestLocationPermission();
       setPhotoStatus('analyzed');
       showNotify("success", "✨ Skin photo analyzed successfully!");
@@ -516,7 +502,7 @@ export default function App() {
     }
 
     if (photoStatus === 'analysis_error' || location.latitude === null || location.longitude === null) {
-      showNotify("error", "Photo analysis failed due to missing location access. Please grant location permissions and retake the photo.");
+      showNotify("error", "Photo analysis failed. Please retake the photo.");
       return;
     }
 
@@ -945,7 +931,7 @@ export default function App() {
                           )}
                           {photoStatus === 'analysis_error' && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-bold">
-                              <span>⚠️</span> Location Permission Required
+                              <span>⚠️</span> Analysis Error
                             </div>
                           )}
 
@@ -954,7 +940,7 @@ export default function App() {
                           )}
                           {photoStatus === 'analysis_error' && (
                             <p className="text-xs text-rose-600 font-medium">
-                              Location access was denied or timed out. Please allow location permissions and retake the photo.
+                              Photo analysis could not complete. Please retake the photo.
                             </p>
                           )}
 
