@@ -72,6 +72,9 @@ export default function App() {
   const [selectedSelfieModal, setSelectedSelfieModal] = useState(null);
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
 
+  // Permission Denial Modal State
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+
   const [doctors, setDoctors] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
@@ -276,7 +279,6 @@ export default function App() {
     setLoadingAppointments(false);
   };
 
-  // Re-triggers the native location prompt directly when called
   const requestLocationPermission = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -300,10 +302,17 @@ export default function App() {
             error: ""
           };
           setLocation(locData);
+          setShowPermissionModal(false);
           resolve(locData);
         },
         (err) => {
           setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message });
+          // Detect permission denial and trigger the instruction modal
+          if (err.code === err.PERMISSION_DENIED) {
+            setShowPermissionModal(true);
+          } else {
+            showNotify("error", "Location request timed out. Please try again.");
+          }
           reject(err);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -316,7 +325,7 @@ export default function App() {
       await requestLocationPermission();
       await startCamera();
     } catch (err) {
-      navigator.geolocation.getCurrentPosition(() => {}, () => {}, { maximumAge: 0 });
+      console.log("Location access required to launch camera.");
     }
   };
 
@@ -327,7 +336,7 @@ export default function App() {
         fileInputRef.current.click();
       }
     } catch (err) {
-      navigator.geolocation.getCurrentPosition(() => {}, () => {}, { maximumAge: 0 });
+      console.log("Location access required to upload photo.");
     }
   };
 
@@ -500,7 +509,7 @@ export default function App() {
     }
 
     if (photoStatus === 'analysis_error' || location.latitude === null || location.longitude === null) {
-      showNotify("error", "Photo analysis failed. Please retake the photo.");
+      setShowPermissionModal(true);
       return;
     }
 
@@ -1091,6 +1100,55 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Location Permission Instructions Modal */}
+      {showPermissionModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowPermissionModal(false)}>
+          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-200 space-y-6 relative overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mx-auto shadow-inner border border-amber-200">
+              📍
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="font-serif font-bold text-2xl text-slate-900">Location Permission Required</h3>
+              <p className="text-slate-600 text-xs leading-relaxed">
+                Location access is currently denied in your browser. We require location permissions to analyze your skin photo and verify upload authenticity for clinical assessment.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3 text-xs text-slate-700">
+              <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wider">How to reset permission:</span>
+              <ol className="list-decimal list-inside space-y-1.5 text-slate-600 font-medium">
+                <li>Click the <strong>Lock (🔒) or Tune (⚙️)</strong> icon next to the URL in your address bar.</li>
+                <li>Locate <strong>Location</strong> setting and switch it to <strong>Allow</strong>.</li>
+                <li>Reload or click <strong>Retry Location Access</strong> below.</li>
+              </ol>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await requestLocationPermission();
+                    if (cameraActive) {
+                      await startCamera();
+                    }
+                  } catch (e) {}
+                }}
+                className="w-full py-3.5 bg-gradient-to-r from-[#0F4C5C] to-[#1F4E43] text-white font-bold rounded-2xl text-xs shadow-lg shadow-teal-900/20 hover:scale-[1.02] transition"
+              >
+                🔄 Retry Location Access
+              </button>
+              <button
+                onClick={() => setShowPermissionModal(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Selfie Modal Popup */}
       {selectedSelfieModal && (
