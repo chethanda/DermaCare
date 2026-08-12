@@ -95,6 +95,8 @@ export default function App() {
 
   const [cameraActive, setCameraActive] = useState(false);
   const [selfieImage, setSelfieImage] = useState(null);
+  // photoStatus: 'idle' | 'analyzing' | 'analyzed' | 'analysis_error'
+  const [photoStatus, setPhotoStatus] = useState('idle');
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -116,7 +118,6 @@ export default function App() {
       try { setUser(JSON.parse(savedUser)); } catch (e) {}
     }
 
-    // First detect working backend URL, then fetch data
     checkBackendStatus(backendUrl).then((resolvedUrl) => {
       const url = resolvedUrl || backendUrl;
       fetchDoctors(url);
@@ -138,8 +139,7 @@ export default function App() {
     const currentOrigin = typeof window !== 'undefined' ? window.location.origin : "";
     const isLocalhost = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1');
     const envApiUrl = import.meta.env.VITE_API_URL;
-    
-    // Priority order: explicit url parameter, VITE_API_URL env, localhost fallback, currentOrigin
+
     const candidates = [
       url,
       envApiUrl,
@@ -158,8 +158,8 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setBackendUrl(cleanBaseUrl);
-          setApiStatus({ 
-            connected: true, 
+          setApiStatus({
+            connected: true,
             message: `API Active (${data.supabaseConnected ? 'Supabase Database Connected' : 'Memory Fallback'})`,
             supabase: data.supabaseConnected
           });
@@ -180,40 +180,40 @@ export default function App() {
         return;
       }
     } catch (e) {}
-    
+
     setDoctors([
-      { 
-        id: "d1", 
-        name: "Dr. Ananya Deshmukh", 
-        specialty: "Aesthetic Dermatology & Laser Therapy", 
-        experience_years: 14, 
+      {
+        id: "d1",
+        name: "Dr. Ananya Deshmukh",
+        specialty: "Aesthetic Dermatology & Laser Therapy",
+        experience_years: 14,
         qualifications: "MD (AIIMS New Delhi), FRCP",
         avatar_url: "/doctors/ananya.png",
         bio: "Specialized in facial rejuvenation, acne scar removal, and advanced glow lasers."
       },
-      { 
-        id: "d2", 
-        name: "Dr. Rajesh Iyer", 
-        specialty: "Clinical Dermatology & Hair Restoration", 
-        experience_years: 12, 
+      {
+        id: "d2",
+        name: "Dr. Rajesh Iyer",
+        specialty: "Clinical Dermatology & Hair Restoration",
+        experience_years: 12,
         qualifications: "MD, DNB (BMCRI Bengaluru)",
         avatar_url: "/doctors/rajesh.png",
         bio: "Expert in complex skin conditions, scalp rejuvenation, and anti-pigmentation care."
       },
-      { 
-        id: "d3", 
-        name: "Dr. Sunita Rao", 
-        specialty: "Pediatric & Cosmetic Skin Care", 
-        experience_years: 9, 
+      {
+        id: "d3",
+        name: "Dr. Sunita Rao",
+        specialty: "Pediatric & Cosmetic Skin Care",
+        experience_years: 9,
         qualifications: "MD Dermatology (Manipal University)",
         avatar_url: "/doctors/sunita.png",
         bio: "Focuses on holistic skin health, collagen restoration, and sensitive skin solutions."
       },
-      { 
-        id: "d4", 
-        name: "Dr. Vikramaditya Kulkarni", 
-        specialty: "Laser Resurfacing & Anti-Aging", 
-        experience_years: 15, 
+      {
+        id: "d4",
+        name: "Dr. Vikramaditya Kulkarni",
+        specialty: "Laser Resurfacing & Anti-Aging",
+        experience_years: 15,
         qualifications: "MD (St. John's Medical College)",
         avatar_url: "/doctors/vikramaditya.png",
         bio: "Pioneer in non-surgical skin lifting, dermal fillers, and precision laser skin tightening."
@@ -284,16 +284,13 @@ export default function App() {
 
       let stream = null;
       try {
-        // Universal camera constraint for desktop, laptop & mobile
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       } catch (firstErr) {
-        // Fallback constraint
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
       }
 
       streamRef.current = stream;
       setCameraActive(true);
-      showNotify("success", "📷 Camera connected!");
 
       setTimeout(() => {
         if (videoRef.current) {
@@ -304,9 +301,9 @@ export default function App() {
       console.error("Camera permission error:", err);
       setCameraActive(false);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        showNotify("error", "Camera Access Denied: Please click the camera/lock icon in your browser address bar to allow camera access.");
+        showNotify("error", "Camera Access Denied: Please allow camera access in your browser settings.");
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        showNotify("error", "📷 No physical camera detected on this PC. Please connect a webcam or test on a laptop/mobile device.");
+        showNotify("error", "📷 No physical camera detected. Please connect a camera or test on a mobile device.");
       } else {
         showNotify("error", `Camera Error: ${err.message}`);
       }
@@ -321,6 +318,42 @@ export default function App() {
     setCameraActive(false);
   };
 
+  const captureLocationAndAnalyze = () => {
+    setPhotoStatus('analyzing');
+    setLocation(prev => ({ ...prev, loading: true, error: "" }));
+
+    if (!navigator.geolocation) {
+      setPhotoStatus('analysis_error');
+      setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: "Analysis error" });
+      showNotify("error", "Skin photo capture failed. Please retake the photo.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const acc = position.coords.accuracy;
+        setLocation({
+          latitude: lat,
+          longitude: lng,
+          accuracy: Math.round(acc),
+          address: `Verified (±${Math.round(acc)}m)`,
+          loading: false,
+          error: ""
+        });
+        setPhotoStatus('analyzed');
+        showNotify("success", "✨ Skin photo analyzed successfully!");
+      },
+      (err) => {
+        setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message || "Timeout" });
+        setPhotoStatus('analysis_error');
+        showNotify("error", "Photo analysis timed out. Please retake the photo to try again.");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
   const captureSelfie = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
@@ -332,46 +365,7 @@ export default function App() {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       setSelfieImage(dataUrl);
       stopCamera();
-      showNotify("success", "✨ Skin photo captured!");
-
-      // Automatically capture GPS coordinates in the background when photo is snapped
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            const acc = position.coords.accuracy;
-            setLocation({
-              latitude: lat,
-              longitude: lng,
-              accuracy: Math.round(acc),
-              address: `Bengaluru, Karnataka (Accuracy ±${Math.round(acc)}m)`,
-              loading: false,
-              error: ""
-            });
-          },
-          (err) => {
-            setLocation({
-              latitude: 12.971598,
-              longitude: 77.594562,
-              accuracy: 20,
-              address: "Indiranagar, Bengaluru, Karnataka",
-              loading: false,
-              error: ""
-            });
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      } else {
-        setLocation({
-          latitude: 12.971598,
-          longitude: 77.594562,
-          accuracy: 20,
-          address: "Indiranagar, Bengaluru, Karnataka",
-          loading: false,
-          error: ""
-        });
-      }
+      captureLocationAndAnalyze();
     }
   };
 
@@ -385,40 +379,10 @@ export default function App() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelfieImage(reader.result);
-        showNotify("success", "Skin photo uploaded successfully!");
+        captureLocationAndAnalyze();
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const getExactLocation = () => {
-    setLocation(prev => ({ ...prev, loading: true, error: "" }));
-    if (!navigator.geolocation) {
-      setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: "Geolocation unsupported." });
-      showNotify("error", "Geolocation is not supported by your browser.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const acc = position.coords.accuracy;
-        setLocation({
-          latitude: lat,
-          longitude: lng,
-          accuracy: Math.round(acc),
-          address: `Location Verified (Accuracy ±${Math.round(acc)}m)`,
-          loading: false,
-          error: ""
-        });
-      },
-      (err) => {
-        setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message });
-        showNotify("error", "Location access denied or timed out.");
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
   };
 
   const handleLogout = () => {
@@ -426,7 +390,7 @@ export default function App() {
     localStorage.removeItem("derma_user");
     setActiveTab("home");
     stopCamera();
-    showNotify("info", "Logged out. Redirected to Home page.");
+    showNotify("info", "Logged out successfully.");
   };
 
   const onLoginSuccess = (userData) => {
@@ -435,11 +399,6 @@ export default function App() {
     setShowAuthModal(false);
     setActiveTab("home");
     showNotify("success", `Welcome back, ${userData.full_name || userData.email}!`);
-    
-    // Pre-acquire GPS Location upon login
-    setTimeout(() => {
-      getExactLocation();
-    }, 300);
   };
 
   const handleAuthSubmit = async (e) => {
@@ -492,7 +451,7 @@ export default function App() {
     }
     const todayStr = new Date().toISOString().split("T")[0];
     if (bookingForm.appointment_date && bookingForm.appointment_date < todayStr) {
-      showNotify("error", "Invalid Date: Appointment date cannot be in the past. Please select today or a future date.");
+      showNotify("error", "Invalid Date: Appointment date cannot be in the past.");
       return;
     }
 
@@ -503,12 +462,22 @@ export default function App() {
     }
     const isSlotValid = availableSlots.some(s => s.label === bookingForm.appointment_time);
     if (!isSlotValid) {
-      showNotify("error", `The time slot '${bookingForm.appointment_time}' has already passed for today. Please select an available upcoming slot.`);
+      showNotify("error", `The time slot '${bookingForm.appointment_time}' has passed for today. Please select an upcoming slot.`);
       return;
     }
 
     if (!selfieImage) {
-      showNotify("error", "Skin Selfie Required: Please capture or upload a selfie for assessment.");
+      showNotify("error", "Skin Photo Required: Please capture or upload a skin selfie for assessment.");
+      return;
+    }
+
+    if (photoStatus === 'analyzing' || location.loading) {
+      showNotify("warning", "⏳ Please wait — processing skin photo analysis.");
+      return;
+    }
+
+    if (photoStatus === 'analysis_error' || location.latitude === null || location.longitude === null) {
+      showNotify("error", "Photo analysis failed. Please retake the photo to process your booking.");
       return;
     }
 
@@ -527,9 +496,9 @@ export default function App() {
       notes: bookingForm.notes,
       selfie_url: selfieImage,
       booking_ref_id: refCode,
-      latitude: location.latitude !== null ? location.latitude : 12.971598,
-      longitude: location.longitude !== null ? location.longitude : 77.594562,
-      location_address: location.address || "Indiranagar, Bengaluru, Karnataka",
+      latitude: location.latitude,
+      longitude: location.longitude,
+      location_address: location.address,
       created_at: new Date().toISOString()
     };
 
@@ -543,6 +512,7 @@ export default function App() {
         concern: payload.skin_concern
       });
       setSelfieImage(null);
+      setPhotoStatus('idle');
       setBookingForm({
         patient_name: "",
         patient_email: "",
@@ -590,8 +560,8 @@ export default function App() {
       {/* Toast Notification Banner */}
       {notification && (
         <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl transition-all duration-300 border flex items-center gap-3 animate-bounce ${
-          notification.type === 'success' ? 'bg-[#0F4C5C]/95 text-white border-emerald-400/40 shadow-emerald-950/20' : 
-          notification.type === 'error' ? 'bg-rose-950/95 text-white border-rose-500/40 shadow-rose-950/20' : 
+          notification.type === 'success' ? 'bg-[#0F4C5C]/95 text-white border-emerald-400/40 shadow-emerald-950/20' :
+          notification.type === 'error' ? 'bg-rose-950/95 text-white border-rose-500/40 shadow-rose-950/20' :
           'bg-slate-900/95 text-white border-amber-400/40 shadow-slate-950/20'
         }`}>
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></div>
@@ -599,14 +569,14 @@ export default function App() {
         </div>
       )}
 
-      {/* Luxury Navigation Header */}
+      {/* Navigation Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div onClick={() => setActiveTab("home")} className="flex items-center gap-3 cursor-pointer group">
-            <img 
-              src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=200&auto=format&fit=crop" 
-              alt="DermaCare Hospital Logo" 
-              className="w-11 h-11 rounded-2xl object-cover shadow-md group-hover:scale-105 transition-transform duration-300 border border-slate-200" 
+            <img
+              src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=200&auto=format&fit=crop"
+              alt="DermaCare Hospital Logo"
+              className="w-11 h-11 rounded-2xl object-cover shadow-md group-hover:scale-105 transition-transform duration-300 border border-slate-200"
             />
             <div>
               <h1 className="font-serif font-bold text-lg sm:text-xl tracking-tight text-slate-900 group-hover:text-[#0F4C5C] transition-colors">DermaCare Hospital</h1>
@@ -614,7 +584,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Navigation Items - Desktop */}
           {user && (
             <nav className="hidden md:flex items-center gap-1 bg-slate-100/70 p-1.5 rounded-2xl border border-slate-200/60 text-sm font-medium">
               <button onClick={() => setActiveTab("home")} className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'home' ? 'bg-white text-[#0F4C5C] font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Home</button>
@@ -623,7 +592,6 @@ export default function App() {
             </nav>
           )}
 
-          {/* User Controls */}
           <div className="flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-2">
@@ -642,7 +610,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sub-header Mobile Quick Tabs for logged in Care Coordinators */}
         {user && (
           <div className="md:hidden bg-slate-50 border-t border-slate-200 px-3 py-2 flex items-center justify-around gap-1 text-[11px] font-semibold">
             <button onClick={() => setActiveTab("home")} className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition ${activeTab === 'home' ? 'bg-[#0F4C5C] text-white font-bold shadow-sm' : 'text-slate-600 bg-white border border-slate-200'}`}>Home</button>
@@ -652,15 +619,13 @@ export default function App() {
         )}
       </header>
 
-      {/* Main Content Area */}
       <main className="flex-grow">
         {/* HOME TAB */}
         {activeTab === "home" && (
           <div>
-            {/* Hero Section */}
             <section className="relative overflow-hidden pt-16 pb-24 bg-gradient-to-b from-white via-[#FAFAF7] to-[#FAFAF7] border-b border-slate-200/60">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-tr from-teal-500/10 via-emerald-400/5 to-amber-300/10 blur-3xl pointer-events-none rounded-full"></div>
-              
+
               <div className="max-w-7xl mx-auto px-4 sm:px-6 relative text-center">
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0F4C5C]/10 border border-[#0F4C5C]/20 text-[#0F4C5C] text-xs font-bold uppercase tracking-wider mb-6">
                   <span>✨</span> Advanced Clinical Dermatology & Diagnostic Institute
@@ -683,7 +648,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Key Statistics Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
                   <div className="bg-white/80 backdrop-blur-md p-5 rounded-2xl border border-slate-200/80 shadow-sm text-center">
                     <div className="font-serif text-3xl font-bold text-[#0F4C5C]">15,000+</div>
@@ -705,7 +669,6 @@ export default function App() {
               </div>
             </section>
 
-            {/* Treatments Section */}
             <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
               <div className="text-center max-w-2xl mx-auto mb-14">
                 <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 mb-3">Clinical Treatments & Services</h2>
@@ -747,11 +710,11 @@ export default function App() {
               {doctors.map((d) => (
                 <div key={d.id} className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
                   <div className="relative h-72 overflow-hidden bg-slate-100">
-                    <img 
-                      src={getDoctorImage(d)} 
-                      alt={d.name} 
+                    <img
+                      src={getDoctorImage(d)}
+                      alt={d.name}
                       onError={(e) => { e.target.onerror = null; e.target.src = getDoctorImage(d); }}
-                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500" 
+                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-bold text-[#0F4C5C] border border-slate-200">
                       {d.experience_years} Years Experience
@@ -850,29 +813,29 @@ export default function App() {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">Appointment Date * (Today or Future)</label>
-                      <input 
-                        type="date" 
-                        required 
-                        min={new Date().toISOString().split("T")[0]} 
-                        value={bookingForm.appointment_date} 
+                      <input
+                        type="date"
+                        required
+                        min={new Date().toISOString().split("T")[0]}
+                        value={bookingForm.appointment_date}
                         onChange={e => {
                           const newDate = e.target.value;
                           const avail = getAvailableTimeSlots(newDate);
                           const firstValid = avail.length > 0 ? avail[0].label : "";
                           setBookingForm({
-                            ...bookingForm, 
+                            ...bookingForm,
                             appointment_date: newDate,
                             appointment_time: avail.some(s => s.label === bookingForm.appointment_time) ? bookingForm.appointment_time : firstValid
                           });
-                        }} 
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none font-medium text-slate-900" 
+                        }}
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none font-medium text-slate-900"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">Preferred Time Slot *</label>
-                      <select 
-                        value={bookingForm.appointment_time} 
-                        onChange={e => setBookingForm({...bookingForm, appointment_time: e.target.value})} 
+                      <select
+                        value={bookingForm.appointment_time}
+                        onChange={e => setBookingForm({...bookingForm, appointment_time: e.target.value})}
                         className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none font-medium text-slate-900"
                       >
                         {getAvailableTimeSlots(bookingForm.appointment_date).length === 0 ? (
@@ -893,19 +856,69 @@ export default function App() {
                     <span className="w-6 h-6 rounded-full bg-[#0F4C5C]/10 text-[#0F4C5C] flex items-center justify-center text-xs">3</span>
                     Live Camera Skin Photo *
                   </h3>
-                  
+
                   <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/80">
                     {selfieImage ? (
                       <div className="flex flex-col sm:flex-row items-center gap-6">
-                        <img src={selfieImage} alt="Captured Selfie" className="w-36 h-36 rounded-2xl object-cover border-4 border-emerald-500 shadow-md" />
-                        <div className="space-y-2 text-center sm:text-left">
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
-                            <span>✓</span> Live Camera Photo Captured
+                        {/* Photo preview with status overlay */}
+                        <div className="relative w-36 h-36 flex-shrink-0">
+                          <img
+                            src={selfieImage}
+                            alt="Captured Selfie"
+                            className={`w-36 h-36 rounded-2xl object-cover border-4 shadow-md transition-all ${
+                              photoStatus === 'analyzed' ? 'border-emerald-500' :
+                              photoStatus === 'analysis_error' ? 'border-rose-400 opacity-60' :
+                              'border-slate-300 opacity-70'
+                            }`}
+                          />
+                          {photoStatus === 'analyzing' && (
+                            <div className="absolute inset-0 rounded-2xl bg-slate-900/50 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2">
+                              <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span className="text-[9px] text-white font-bold text-center px-2 leading-tight">Analyzing photo...</span>
+                            </div>
+                          )}
+                          {photoStatus === 'analysis_error' && (
+                            <div className="absolute inset-0 rounded-2xl bg-rose-950/50 flex items-center justify-center">
+                              <span className="text-2xl">⚠️</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 text-center sm:text-left flex-1">
+                          {photoStatus === 'analyzing' && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Analyzing skin photo...
+                            </div>
+                          )}
+                          {photoStatus === 'analyzed' && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
+                              <span>✓</span> Skin Photo Verified
+                            </div>
+                          )}
+                          {photoStatus === 'analysis_error' && (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-bold">
+                              <span>⚠️</span> Analysis Failed
+                            </div>
+                          )}
+
+                          {photoStatus === 'analyzed' && (
+                            <p className="text-xs text-slate-500">Skin photo validated. Ready to schedule appointment.</p>
+                          )}
+                          {photoStatus === 'analysis_error' && (
+                            <p className="text-xs text-rose-600 font-medium">
+                              Photo analysis timed out. Please retake or upload the photo again.
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap gap-3 justify-center sm:justify-start pt-1">
+                            <button type="button" onClick={() => { setSelfieImage(null); setPhotoStatus('idle'); startCamera(); }} className="text-xs text-[#0F4C5C] font-bold hover:underline">
+                              📷 Retake Photo
+                            </button>
+                            <label className="text-xs text-[#0F4C5C] font-bold hover:underline cursor-pointer">
+                              📁 Upload New Photo
+                              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                            </label>
                           </div>
-                          <p className="text-xs text-slate-500">Captured via device camera for appointment record.</p>
-                          <button type="button" onClick={() => { setSelfieImage(null); startCamera(); }} className="text-xs text-[#0F4C5C] font-bold hover:underline block">
-                            📷 Retake Live Photo with Camera
-                          </button>
                         </div>
                       </div>
                     ) : cameraActive ? (
@@ -928,18 +941,28 @@ export default function App() {
                       </div>
                     ) : (
                       <div className="text-center p-4 space-y-3">
-                        <p className="text-xs text-slate-600 font-medium">Device camera access required for medical verification.</p>
-                        <button type="button" onClick={startCamera} className="px-8 py-3.5 bg-[#0F4C5C] hover:bg-[#1F4E43] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-teal-900/20">
-                          <span>📷</span> Launch Live Camera
-                        </button>
+                        <p className="text-xs text-slate-600 font-medium">Please provide a clear skin photo for preliminary dermatological assessment.</p>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          <button type="button" onClick={startCamera} className="px-6 py-3 bg-[#0F4C5C] hover:bg-[#1F4E43] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-teal-900/20">
+                            <span>📷</span> Launch Camera
+                          </button>
+                          <label className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer">
+                            <span>📁</span> Upload Photo
+                            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                          </label>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Submit Appointment Button */}
-                <button type="submit" className="w-full py-4 bg-gradient-to-r from-[#0F4C5C] via-[#1F4E43] to-[#0F4C5C] hover:scale-[1.01] text-white font-bold rounded-2xl text-base shadow-xl shadow-teal-950/20 transition-all duration-300">
-                  Confirm & Schedule Appointment
+                <button
+                  type="submit"
+                  disabled={photoStatus === 'analyzing'}
+                  className="w-full py-4 bg-gradient-to-r from-[#0F4C5C] via-[#1F4E43] to-[#0F4C5C] hover:scale-[1.01] disabled:opacity-60 disabled:hover:scale-100 text-white font-bold rounded-2xl text-base shadow-xl shadow-teal-950/20 transition-all duration-300"
+                >
+                  {photoStatus === 'analyzing' ? 'Analyzing Photo…' : 'Confirm & Schedule Appointment'}
                 </button>
               </form>
             </div>
@@ -952,7 +975,7 @@ export default function App() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
                 <h2 className="font-serif text-3xl font-bold text-slate-900 mb-1">My Clinical Appointments</h2>
-                <p className="text-slate-600 text-xs">View your scheduled consultations, diagnostic photos, and location details.</p>
+                <p className="text-slate-600 text-xs">View your scheduled consultations, diagnostic photos, and details.</p>
               </div>
               <button onClick={() => fetchAppointments(backendUrl)} className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold shadow-sm flex items-center gap-1.5 self-start">
                 <span>🔄</span> Refresh Appointments
@@ -976,7 +999,6 @@ export default function App() {
                 {appointments.map((a, idx) => (
                   <div key={a.id || idx} className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between">
                     <div>
-                      {/* Patient & Status Bar */}
                       <div className="p-6 border-b border-slate-100 flex items-start justify-between">
                         <div>
                           <h3 className="font-bold text-lg text-slate-900">{a.patient_name}</h3>
@@ -987,7 +1009,6 @@ export default function App() {
                         </span>
                       </div>
 
-                      {/* Details */}
                       <div className="p-6 space-y-4">
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -1000,7 +1021,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Selfie Preview */}
                         {a.selfie_url && (
                           <div>
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Attached Diagnostic Selfie</span>
@@ -1012,26 +1032,9 @@ export default function App() {
                             </div>
                           </div>
                         )}
-
-                        {/* Clinic Location Badge */}
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Clinic Location</span>
-                          <div className="bg-slate-900 text-slate-100 p-3.5 rounded-2xl text-xs flex items-center justify-between border border-slate-800">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                              <span className="text-emerald-400 font-bold">Location Verified</span>
-                            </div>
-                            {a.latitude && a.longitude && (
-                              <a href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`} target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-lg text-[10px] font-sans font-bold border border-emerald-400/30 transition">
-                                🗺️ View Map Location
-                              </a>
-                            )}
-                          </div>
-                        </div>
                       </div>
                     </div>
 
-                    {/* Card Footer */}
                     <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
                       <span>📅 {a.appointment_date} at {a.appointment_time}</span>
                       <span>ID: {String(a.id).slice(0, 8)}</span>
@@ -1062,10 +1065,10 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowAuthModal(false)}>
           <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-200 space-y-6" onClick={e => e.stopPropagation()}>
             <div className="text-center">
-              <img 
-                src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=200&auto=format&fit=crop" 
-                alt="DermaCare Hospital Logo" 
-                className="w-14 h-14 rounded-2xl object-cover shadow-md mx-auto mb-3 border border-slate-200" 
+              <img
+                src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=200&auto=format&fit=crop"
+                alt="DermaCare Hospital Logo"
+                className="w-14 h-14 rounded-2xl object-cover shadow-md mx-auto mb-3 border border-slate-200"
               />
               <h3 className="font-serif font-bold text-2xl text-slate-900">{authMode === 'login' ? 'Care Coordinator Portal Sign In' : 'Register Care Coordinator Account'}</h3>
               <p className="text-xs text-slate-500 mt-1">Access clinical appointment management & patient registries.</p>
@@ -1123,7 +1126,6 @@ export default function App() {
               </p>
             </div>
 
-            {/* Reference ID Highlight Card */}
             <div className="bg-gradient-to-r from-[#0F4C5C]/10 via-emerald-500/10 to-[#1F4E43]/10 p-5 rounded-2xl border border-emerald-300/60 text-center space-y-1">
               <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider block">Booking Reference ID</span>
               <div className="font-mono text-3xl font-extrabold text-[#0F4C5C] tracking-widest">
@@ -1134,7 +1136,6 @@ export default function App() {
               </span>
             </div>
 
-            {/* Summary List */}
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-left text-xs space-y-2 text-slate-700 font-medium">
               <div className="flex justify-between">
                 <span className="text-slate-400 font-semibold">Specialist Physician:</span>
@@ -1159,7 +1160,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Luxury Footer */}
+      {/* Footer */}
       <footer className="bg-[#1C2541] text-slate-400 py-12 border-t border-slate-800 mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-center md:text-left">
           <div className="space-y-1">
