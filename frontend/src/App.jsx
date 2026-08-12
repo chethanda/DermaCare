@@ -467,6 +467,12 @@ export default function App() {
       showNotify("warning", "🔒 Authentication Required: Please sign in to book an appointment.");
       return;
     }
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (bookingForm.appointment_date && bookingForm.appointment_date < todayStr) {
+      showNotify("error", "Invalid Date: Appointment date cannot be in the past. Please select today or a future date.");
+      return;
+    }
+
     if (!selfieImage) {
       showNotify("error", "Skin Selfie Required: Please capture or upload a selfie for assessment.");
       return;
@@ -809,8 +815,15 @@ export default function App() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Appointment Date *</label>
-                      <input type="date" required value={bookingForm.appointment_date} onChange={e => setBookingForm({...bookingForm, appointment_date: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none" />
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Appointment Date * (Today or Future)</label>
+                      <input 
+                        type="date" 
+                        required 
+                        min={new Date().toISOString().split("T")[0]} 
+                        value={bookingForm.appointment_date} 
+                        onChange={e => setBookingForm({...bookingForm, appointment_date: e.target.value})} 
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0F4C5C] outline-none font-medium text-slate-900" 
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">Preferred Time Slot *</label>
