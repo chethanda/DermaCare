@@ -100,6 +100,7 @@ export default function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const [location, setLocation] = useState({
     latitude: null,
@@ -275,6 +276,68 @@ export default function App() {
     setLoadingAppointments(false);
   };
 
+  // Prompts for location permission first before enabling camera or upload
+  const requestLocationPermission = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        showNotify("error", "Geolocation is not supported by your browser.");
+        reject(new Error("Geolocation unsupported"));
+        return;
+      }
+
+      setLocation(prev => ({ ...prev, loading: true, error: "" }));
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const acc = position.coords.accuracy;
+          const locData = {
+            latitude: lat,
+            longitude: lng,
+            accuracy: Math.round(acc),
+            address: `Verified Location (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`,
+            loading: false,
+            error: ""
+          };
+          setLocation(locData);
+          resolve(locData);
+        },
+        (err) => {
+          setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message || "Location permission denied." });
+          setPhotoStatus('analysis_error');
+          showNotify("error", "📍 Location access is required. Please allow location permissions in your browser settings to proceed.");
+          reject(err);
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    });
+  };
+
+  const handleLaunchCamera = async () => {
+    try {
+      // Require location permission first
+      await requestLocationPermission();
+      // On success, start camera
+      await startCamera();
+    } catch (err) {
+      console.log("Camera launch blocked until location permission is granted.");
+    }
+  };
+
+  const handleUploadClick = async () => {
+    try {
+      // Require location permission first
+      await requestLocationPermission();
+      // On success, trigger file input picker
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+    } catch (err) {
+      console.log("Upload blocked until location permission is granted.");
+    }
+  };
+
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -318,40 +381,16 @@ export default function App() {
     setCameraActive(false);
   };
 
-  const captureLocationAndAnalyze = () => {
+  const captureLocationAndAnalyze = async () => {
     setPhotoStatus('analyzing');
-    setLocation(prev => ({ ...prev, loading: true, error: "" }));
-
-    if (!navigator.geolocation) {
+    try {
+      // Re-verify location during photo analysis
+      await requestLocationPermission();
+      setPhotoStatus('analyzed');
+      showNotify("success", "✨ Skin photo analyzed successfully!");
+    } catch (err) {
       setPhotoStatus('analysis_error');
-      setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: "Analysis error" });
-      showNotify("error", "Skin photo capture failed. Please retake the photo.");
-      return;
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const acc = position.coords.accuracy;
-        setLocation({
-          latitude: lat,
-          longitude: lng,
-          accuracy: Math.round(acc),
-          address: `Verified Location (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`,
-          loading: false,
-          error: ""
-        });
-        setPhotoStatus('analyzed');
-        showNotify("success", "✨ Skin photo analyzed successfully!");
-      },
-      (err) => {
-        setLocation({ latitude: null, longitude: null, accuracy: null, address: "", loading: false, error: err.message || "Timeout" });
-        setPhotoStatus('analysis_error');
-        showNotify("error", "Photo analysis timed out. Please retake the photo to try again.");
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-    );
   };
 
   const captureSelfie = () => {
@@ -477,7 +516,7 @@ export default function App() {
     }
 
     if (photoStatus === 'analysis_error' || location.latitude === null || location.longitude === null) {
-      showNotify("error", "Photo analysis failed. Please retake the photo to process your booking.");
+      showNotify("error", "Photo analysis failed due to missing location access. Please grant location permissions and retake the photo.");
       return;
     }
 
@@ -557,6 +596,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FAFAF7] text-[#1C2541] flex flex-col font-sans selection:bg-[#0F4C5C] selection:text-white">
+      {/* Hidden File Input for Image Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
       {/* Toast Notification Banner */}
       {notification && (
         <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-xl transition-all duration-300 border flex items-center gap-3 animate-bounce ${
@@ -897,7 +945,7 @@ export default function App() {
                           )}
                           {photoStatus === 'analysis_error' && (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-bold">
-                              <span>⚠️</span> Analysis Failed
+                              <span>⚠️</span> Location Permission Required
                             </div>
                           )}
 
@@ -906,18 +954,17 @@ export default function App() {
                           )}
                           {photoStatus === 'analysis_error' && (
                             <p className="text-xs text-rose-600 font-medium">
-                              Photo analysis timed out. Please retake or upload the photo again.
+                              Location access was denied or timed out. Please allow location permissions and retake the photo.
                             </p>
                           )}
 
                           <div className="flex flex-wrap gap-3 justify-center sm:justify-start pt-1">
-                            <button type="button" onClick={() => { setSelfieImage(null); setPhotoStatus('idle'); startCamera(); }} className="text-xs text-[#0F4C5C] font-bold hover:underline">
+                            <button type="button" onClick={handleLaunchCamera} className="text-xs text-[#0F4C5C] font-bold hover:underline">
                               📷 Retake Photo
                             </button>
-                            <label className="text-xs text-[#0F4C5C] font-bold hover:underline cursor-pointer">
+                            <button type="button" onClick={handleUploadClick} className="text-xs text-[#0F4C5C] font-bold hover:underline">
                               📁 Upload New Photo
-                              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                            </label>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -943,13 +990,12 @@ export default function App() {
                       <div className="text-center p-4 space-y-3">
                         <p className="text-xs text-slate-600 font-medium">Please provide a clear skin photo for preliminary dermatological assessment.</p>
                         <div className="flex flex-wrap justify-center gap-3">
-                          <button type="button" onClick={startCamera} className="px-6 py-3 bg-[#0F4C5C] hover:bg-[#1F4E43] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-teal-900/20">
+                          <button type="button" onClick={handleLaunchCamera} className="px-6 py-3 bg-[#0F4C5C] hover:bg-[#1F4E43] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-teal-900/20">
                             <span>📷</span> Launch Camera
                           </button>
-                          <label className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer">
+                          <button type="button" onClick={handleUploadClick} className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer">
                             <span>📁</span> Upload Photo
-                            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                          </label>
+                          </button>
                         </div>
                       </div>
                     )}
