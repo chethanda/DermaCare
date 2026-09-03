@@ -369,22 +369,6 @@ export default function App() {
     }
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        showNotify("error", "Image file too large. Max size 10MB.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelfieImage(reader.result);
-        captureLocationAndAnalyze();
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("derma_user");
@@ -467,7 +451,7 @@ export default function App() {
     }
 
     if (!selfieImage) {
-      showNotify("error", "Skin Photo Required: Please capture or upload a skin selfie for assessment.");
+      showNotify("error", "Skin Photo Required: Please capture a skin selfie for assessment.");
       return;
     }
 
@@ -906,7 +890,7 @@ export default function App() {
                           )}
                           {photoStatus === 'analysis_error' && (
                             <p className="text-xs text-rose-600 font-medium">
-                              Photo analysis timed out. Please retake or upload the photo again.
+                              Photo analysis timed out. Please retake the photo to try again.
                             </p>
                           )}
 
@@ -914,10 +898,6 @@ export default function App() {
                             <button type="button" onClick={() => { setSelfieImage(null); setPhotoStatus('idle'); startCamera(); }} className="text-xs text-[#0F4C5C] font-bold hover:underline">
                               📷 Retake Photo
                             </button>
-                            <label className="text-xs text-[#0F4C5C] font-bold hover:underline cursor-pointer">
-                              📁 Upload New Photo
-                              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                            </label>
                           </div>
                         </div>
                       </div>
@@ -941,15 +921,11 @@ export default function App() {
                       </div>
                     ) : (
                       <div className="text-center p-4 space-y-3">
-                        <p className="text-xs text-slate-600 font-medium">Please provide a clear skin photo for preliminary dermatological assessment.</p>
+                        <p className="text-xs text-slate-600 font-medium">Please take a clear skin photo for preliminary dermatological assessment.</p>
                         <div className="flex flex-wrap justify-center gap-3">
                           <button type="button" onClick={startCamera} className="px-6 py-3 bg-[#0F4C5C] hover:bg-[#1F4E43] text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-teal-900/20">
                             <span>📷</span> Launch Camera
                           </button>
-                          <label className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer">
-                            <span>📁</span> Upload Photo
-                            <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                          </label>
                         </div>
                       </div>
                     )}
